@@ -24,6 +24,19 @@ function updateArticles(res, articles, msg) {
     });
 }
 
+function getNextArticlesId() {
+    const maxId =  articles.reduce((acc, next) => {
+
+        if (Number(next._id) > acc) {
+            return Number(next._id);
+        }
+
+        return acc;
+    }, 0);
+
+    return String(maxId + 1);
+}
+
 app.use((req, res, next) => {
     requestLogger(req);
     next();
@@ -35,70 +48,65 @@ app.get('/blogs', (req, res) => {
 });
 
 app.post('/blogs', (req, res) => {
-    let maxId = articles.reduce((acc, next) => {
-
-        if (Number(next._id) > acc) {
-            return Number(next._id);
-        }
-
-        return acc;
-    }, 0);
-
-    const newArticle = Object.assign({ _id : String(++maxId) }, req.body);
+    const newArticle = Object.assign({ _id : getNextArticlesId() }, req.body);
     const msg = `Atricle '${newArticle.title}' by ${newArticle.author} was added`;
 
     articles.push(newArticle);
     updateArticles(res, articles, msg);
 });
 
-app.get('/blogs/:id', (req, res) => {
+app.use('/blogs/:id', (req, res, next) => {
     const id = req.params.id;
-    const article = articles.find(article => article._id === id);
+    const articleIndex = articles.findIndex(article => article._id === id);
 
-    if (article) {
-        res.send(article);
-        consoleLogger('info', `Send atricle - id: ${article._id}, author: ${article.author}`);
-    } else {
-        consoleLogger('warn', `Can not find the article with id ${id}, redirect to home page`);
-        res.redirect('/');
+    if (articleIndex >= 0) {
+        req.articleIndex = articleIndex;
+        req.article = articles[articleIndex];
     }
+    next();
+});
+
+app.use('/blogs/:id', (req, res, next) => {
+    if (!req.article) {
+        if (req.method === 'PUT' || req.method === 'DELETE') {
+            res.status(404)
+            .send(JSON.stringify({
+                status: 'fail',
+                msg: `Can not find blog id: ${req.params.id}`,
+            }));
+        } else if (req.method === 'GET') {
+            consoleLogger('warn', `Can not find the article with id ${req.params.id}, redirect to eror page`);
+            res.redirect('/404');
+        }
+    } else {
+        next();
+    }
+});
+
+app.get('/blogs/:id', (req, res) => {
+    const article = req.article;
+
+    res.send(article);
+    consoleLogger('info', `Send atricle - id: ${article._id}, author: ${article.author}`);
 });
 
 app.put('/blogs/:id', (req, res) => {
-    const id = req.params.id;
-    const chengedArticleIndex = articles.findIndex(article => article._id === id);
+    let { article, articleIndex } = req;
 
-    if (chengedArticleIndex >= 0) {
-        let article = articles[chengedArticleIndex];
-        const msg = `Atricle id - ${id} was changed`;
+    const msg = `Atricle id - ${article._id} was changed`;
 
-        article = Object.assign(article, req.body);
-        articles.splice(chengedArticleIndex, 1, article);
-        updateArticles(res, articles, msg);
-    } else {
-        res.send(JSON.stringify({
-            status: 'fail',
-            msg: `Can not find bog id: ${id}`,
-        }));
-    }
+    article = Object.assign(article, req.body);
+    articles.splice(articleIndex, 1, article);
+    updateArticles(res, articles, msg);
 });
 
 app.delete('/blogs/:id', (req, res) => {
-    const id = req.params.id;
-    const deletedArticleIndex = articles.findIndex(article => article._id === id);
+    let { article, articleIndex } = req;
 
-    if (deletedArticleIndex >= 0) {
-        const article = articles[deletedArticleIndex];
-        const msg = `Atricle '${article.title}' by ${article.author} was deleted`;
+    const msg = `Atricle '${article.title}' by ${article.author} was deleted`;
 
-        articles.splice(deletedArticleIndex, 1);
-        updateArticles(res, articles, msg);
-    } else {
-        res.send(JSON.stringify({
-            status: 'fail',
-            msg: `Can not find bog id: ${id}`,
-        }));
-    }
+    articles.splice(articleIndex, 1);
+    updateArticles(res, articles, msg);
 });
 
 app.get('/', (req, res) => {
@@ -106,10 +114,15 @@ app.get('/', (req, res) => {
     res.render('index', { title: 'Blogs' });
 });
 
+app.get('/404', (req, res) => {
+    consoleLogger('info', 'Send 404 error page');
+    res.render('404', { title: 'Blogs Error' });
+});
+
 app.get('**', (req, res) => {
     if (req.originalUrl.indexOf('.') < 0) {
-        consoleLogger('warn', `Route '${req.originalUrl}' not configured, redirect to home page`);
-        res.redirect('/');
+        consoleLogger('warn', `Route '${req.originalUrl}' not configured, redirect to 404 page`);
+        res.redirect('/404');
     } else {
         fs.readFile(req.originalUrl, (err, data) => {
             if (err) consoleLogger('warn', `File '${req.originalUrl}' not found`);
