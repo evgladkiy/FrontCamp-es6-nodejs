@@ -1,0 +1,11 @@
+html
+  head
+    title= title
+  body(style={"max-width": "600px", margin: "0 auto", "text-align": "center"})
+    h1(style={margin: "30px 0"})= 'Blogs Home Page'
+    ul(style={"text-align": "left", "font-size": "18px"})
+        li(style={padding: "5px 0"})= 'http://localhost:4444/blogs, method "GET" - Get all blogs'
+        li(style={padding: "5px 0"})= 'http://localhost:4444/blogs/{id}, method "GET" - Get blog by id'
+        li(style={padding: "5px 0"})= 'http://localhost:4444/blogs, method "POST" - Add new blog'
+        li(style={padding: "5px 0"})= 'http://localhost:4444/blogs/{id}, method "PUT" - Update blog by id'
+        li(style={padding: "5px 0"})= 'http://localhost:4444/blogs/{id}, method "DELETE" - Delete blog by id'
